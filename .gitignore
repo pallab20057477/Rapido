@@ -1,0 +1,49 @@
+# Go binary
+*.exe
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+
+# Go build cache
+.go/
+*.test
+*.out
+
+# Dependency management
+vendor/
+go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment & Config
+.env
+.env.local
+.env.*.local
+config/local.conf
+
+# Logs
+*.log
+logs/
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts
+dist/
+build/
+
+# Testing
+coverage.out
+*.cover
