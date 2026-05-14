@@ -1,0 +1,123 @@
+version: '3.8'
+
+# Swarm stack file. Build images locally and tag them before deploying
+services:
+  api:
+    image: rapido/api:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgres://rapido:${DB_PASSWORD}@postgres:5432/rapido?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+    secrets:
+      - DB_PASSWORD
+      - JWT_SECRET
+      - REDIS_PASSWORD
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - rapido-network
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - rapido-network
+
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    environment:
+      - POSTGRES_USER=rapido
+      - POSTGRES_DB=rapido
+    secrets:
+      - DB_PASSWORD
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - rapido-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    secrets:
+      - REDIS_PASSWORD
+    volumes:
+      - redis_data:/data
+    networks:
+      - rapido-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - rapido-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - rapido-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - rapido-network
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/GRAFANA_PASSWORD
+    secrets:
+      - GRAFANA_PASSWORD
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    networks:
+      - rapido-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  rapido-network:
+    driver: overlay
+
+secrets:
+  DB_PASSWORD:
+    external: true
+  JWT_SECRET:
+    external: true
+  REDIS_PASSWORD:
+    external: true
+  GRAFANA_PASSWORD:
+    external: true

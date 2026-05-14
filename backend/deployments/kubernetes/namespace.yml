@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rapido-production
+  labels:
+    name: rapido-production
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rapido-staging
+  labels:
+    name: rapido-staging
+    environment: staging

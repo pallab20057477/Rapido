@@ -1,0 +1,1770 @@
+{
+  "info": {
+    "_postman_id": "rapido-complete-v2",
+    "name": "Rapido Backend - Complete API Collection",
+    "description": "Full end-to-end Postman collection for Rapido backend. Covers Auth, Driver, Rider, Rides, Payments, Admin, Notifications, SOS, Support, WebSocket, and Health. All requests auto-chain variables via test scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",            "value": "http://localhost:8080" },
+    { "key": "rider_phone",         "value": "9876543210" },
+    { "key": "driver_phone",        "value": "9876543211" },
+    { "key": "admin_email",         "value": "admin@rapido.com" },
+    { "key": "admin_password",      "value": "admin123" },
+    { "key": "access_token",        "value": "" },
+    { "key": "refresh_token",       "value": "" },
+    { "key": "driver_token",        "value": "" },
+    { "key": "driver_refresh",      "value": "" },
+    { "key": "admin_token",         "value": "" },
+    { "key": "rider_id",            "value": "" },
+    { "key": "driver_id",           "value": "" },
+    { "key": "ride_id",             "value": "" },
+    { "key": "scheduled_ride_id",   "value": "" },
+    { "key": "payment_id",          "value": "" },
+    { "key": "payment_method_id",   "value": "" },
+    { "key": "ticket_id",           "value": "" },
+    { "key": "contact_id",          "value": "" },
+    { "key": "notification_id",     "value": "" },
+    { "key": "sos_id",              "value": "" },
+    { "key": "withdrawal_id",       "value": "" },
+    { "key": "surge_id",            "value": "" },
+    { "key": "ride_otp",            "value": "1234" }
+  ],
+  "item": [
+
+    {
+      "name": "00 - Health Checks",
+      "item": [
+        {
+          "name": "Health - Basic",
+          "request": { "method": "GET", "url": "{{base_url}}/health" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status healthy', () => { const b = pm.response.json(); pm.expect(b.status).to.eql('healthy'); });"
+          ]}}]
+        },
+        {
+          "name": "Health - Detailed",
+          "request": { "method": "GET", "url": "{{base_url}}/health/detailed" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has services', () => { const b = pm.response.json(); pm.expect(b).to.have.property('services'); });"
+          ]}}]
+        },
+        {
+          "name": "Health - Readiness",
+          "request": { "method": "GET", "url": "{{base_url}}/ready" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Ready or 503', () => { pm.expect([200,503]).to.include(pm.response.code); });"
+          ]}}]
+        },
+        {
+          "name": "Health - Liveness",
+          "request": { "method": "GET", "url": "{{base_url}}/live" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Metrics (Prometheus)",
+          "request": { "method": "GET", "url": "{{base_url}}/metrics" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "01 - Auth - Admin Login",
+      "item": [
+        {
+          "name": "Admin Login (Password)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"identifier\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "pm.test('Has access_token', () => pm.expect(b.data).to.have.property('access_token'));",
+            "if (b.data && b.data.access_token) {",
+            "  pm.collectionVariables.set('admin_token', b.data.access_token);",
+            "  pm.test('Role is admin', () => pm.expect(b.data.user.role).to.be.oneOf(['admin','super_admin']));",
+            "}"
+          ]}}]
+        },
+        {
+          "name": "Admin - Reset Admin Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/reset-admin-password",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "02 - Auth - Rider",
+      "item": [
+        {
+          "name": "Rider - Request OTP",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/otp/request",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{rider_phone}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('OTP sent', () => { const b = pm.response.json(); pm.expect(b.success).to.be.true; });"
+          ]}}]
+        },
+        {
+          "name": "Rider - Verify OTP (Login/Register)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/otp/verify",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{rider_phone}}\",\n  \"email\": \"rider@example.com\",\n  \"otp\": \"123456\",\n  \"name\": \"Test Rider\",\n  \"user_type\": \"rider\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "pm.test('Has tokens', () => { pm.expect(b.data).to.have.property('access_token'); pm.expect(b.data).to.have.property('refresh_token'); });",
+            "if (b.data) {",
+            "  pm.collectionVariables.set('access_token', b.data.access_token);",
+            "  pm.collectionVariables.set('refresh_token', b.data.refresh_token);",
+            "  if (b.data.user) pm.collectionVariables.set('rider_id', b.data.user.id);",
+            "}"
+          ]}}]
+        },
+        {
+          "name": "Rider - Get Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/profile",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "pm.test('Role is rider', () => pm.expect(b.data.role).to.eql('rider'));",
+            "pm.collectionVariables.set('rider_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Rider - Update Profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/auth/profile",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Rider Updated\",\n  \"email\": \"rider@example.com\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Rider - Check Password Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/password/status",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has has_password field', () => { const b = pm.response.json(); pm.expect(b.data).to.have.property('has_password'); });"
+          ]}}]
+        },
+        {
+          "name": "Rider - Set Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/password/set",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"password\": \"rider123\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400 (already set)', () => pm.expect([200,400]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Rider - Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.access_token) {",
+            "  pm.collectionVariables.set('access_token', b.data.access_token);",
+            "  if (b.data.refresh_token) pm.collectionVariables.set('refresh_token', b.data.refresh_token);",
+            "}"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "03 - Auth - Driver",
+      "item": [
+        {
+          "name": "Driver - Request OTP",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/otp/request",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{driver_phone}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver - Verify OTP (Login/Register)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/otp/verify",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"{{driver_phone}}\",\n  \"email\": \"driver@example.com\",\n  \"otp\": \"123456\",\n  \"name\": \"Test Driver\",\n  \"user_type\": \"driver\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data) {",
+            "  pm.collectionVariables.set('driver_token', b.data.access_token);",
+            "  pm.collectionVariables.set('driver_refresh', b.data.refresh_token);",
+            "  if (b.data.user) pm.collectionVariables.set('driver_id', b.data.user.id);",
+            "}"
+          ]}}]
+        },
+        {
+          "name": "Driver - Register (Submit Documents)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/drivers/register",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"license_number\": \"KA0120241234567\",\n  \"license_image\": \"https://example.com/license.png\",\n  \"license_expiry\": \"2030-12-31T00:00:00Z\",\n  \"rc_number\": \"KA01RC1234\",\n  \"rc_image\": \"https://example.com/rc.png\",\n  \"aadhaar_number\": \"123412341234\",\n  \"aadhaar_image\": \"https://example.com/aadhaar.png\",\n  \"vehicle_type\": \"bike\",\n  \"vehicle_make\": \"Honda\",\n  \"vehicle_model\": \"Activa\",\n  \"vehicle_year\": 2022,\n  \"vehicle_color\": \"Black\",\n  \"vehicle_number_plate\": \"KA01AB1234\",\n  \"fuel_type\": \"petrol\",\n  \"vehicle_image\": \"https://example.com/bike.png\",\n  \"languages\": [\"en\", \"hi\"]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 409 (already registered)', () => pm.expect([201,409,200]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('driver_id', b.data.id);"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "04 - Admin - Driver Verification",
+      "item": [
+        {
+          "name": "Admin - List Pending Drivers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/drivers/pending?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","admin","drivers","pending"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('driver_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Admin - Get Driver Details",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/admin/drivers/{{driver_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Approve Driver",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/drivers/{{driver_id}}/verify",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"verified\": true,\n  \"notes\": \"Documents verified, approved for testing\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Create Driver (Auto-Verified)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/drivers/create",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Auto Driver\",\n  \"email\": \"autodriver@example.com\",\n  \"phone\": \"9876543299\",\n  \"password\": \"driver123\",\n  \"license_number\": \"KA0120249999999\",\n  \"license_image\": \"https://example.com/license.png\",\n  \"license_expiry\": \"2030-12-31T00:00:00Z\",\n  \"rc_number\": \"KA01RC9999\",\n  \"rc_image\": \"https://example.com/rc.png\",\n  \"aadhaar_number\": \"999999999999\",\n  \"aadhaar_image\": \"https://example.com/aadhaar.png\",\n  \"vehicle_type\": \"bike\",\n  \"vehicle_make\": \"Honda\",\n  \"vehicle_model\": \"Activa\",\n  \"vehicle_year\": 2022,\n  \"vehicle_color\": \"Red\",\n  \"vehicle_number_plate\": \"KA01ZZ9999\",\n  \"fuel_type\": \"petrol\",\n  \"languages\": [\"en\"],\n  \"auto_verify\": true\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 409', () => pm.expect([201,409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin - All Drivers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/drivers?page=1&per_page=20&verified=true", "host": ["{{base_url}}"], "path": ["api","v1","admin","drivers"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"},{"key":"verified","value":"true"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "05 - Driver - Profile & Location",
+      "item": [
+        {
+          "name": "Driver - Get Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/drivers/profile",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driver_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('driver_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Driver - Update Profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/drivers/profile",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"languages\": [\"en\", \"hi\", \"kn\"]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver - Go Online",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/drivers/online",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 19.0760,\n  \"lng\": 72.8777\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver - Update Location",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/drivers/location",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 19.0760,\n  \"lng\": 72.8777,\n  \"accuracy\": 5\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver - Get Earnings",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/drivers/earnings",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driver_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver - Get Stats",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/drivers/stats",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driver_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver - Go Offline",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/drivers/offline",
+            "header": [{ "key": "Authorization", "value": "Bearer {{driver_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "06 - Wallet & Payment Methods",
+      "item": [
+        {
+          "name": "Wallet - Get Balance",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/wallet",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has balance', () => { const b = pm.response.json(); pm.expect(b.data).to.have.property('balance'); });"
+          ]}}]
+        },
+        {
+          "name": "Wallet - Add Money",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/wallet/add-money",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "wallet-topup-{{$randomUUID}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 1000,\n  \"method\": \"upi\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Wallet - Transaction History",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/transactions?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","transactions"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Payment Methods - Add Card",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/payments/methods/card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"card_number\": \"4111111111111111\",\n  \"expiry_month\": 12,\n  \"expiry_year\": 2030,\n  \"cvv\": \"123\",\n  \"cardholder_name\": \"Test Rider\",\n  \"card_type\": \"credit\",\n  \"nickname\": \"Main Card\",\n  \"set_as_default\": true\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('payment_method_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Payment Methods - Add UPI",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/payments/methods/upi",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"vpa\": \"test@upi\",\n  \"nickname\": \"Personal UPI\",\n  \"set_as_default\": false\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Payment Methods - List",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/payments/methods",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('payment_method_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Payment Methods - Set Default",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/payments/methods/{{payment_method_id}}/default",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Payment Methods - Remove",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/payments/methods/{{payment_method_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "07 - Rides - Estimation & Discovery",
+      "item": [
+        {
+          "name": "Rides - Fare Estimate",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/rides/estimate?pickup_lat=19.0760&pickup_lng=72.8777&dropoff_lat=19.0178&dropoff_lng=72.8478&vehicle_type=bike", "host": ["{{base_url}}"], "path": ["api","v1","rides","estimate"], "query": [{"key":"pickup_lat","value":"19.0760"},{"key":"pickup_lng","value":"72.8777"},{"key":"dropoff_lat","value":"19.0178"},{"key":"dropoff_lng","value":"72.8478"},{"key":"vehicle_type","value":"bike"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has fare data', () => { const b = pm.response.json(); pm.expect(b.data).to.exist; });"
+          ]}}]
+        },
+        {
+          "name": "Rides - Nearby Drivers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/drivers/nearby?lat=19.0760&lng=72.8777&vehicle_type=bike", "host": ["{{base_url}}"], "path": ["api","v1","drivers","nearby"], "query": [{"key":"lat","value":"19.0760"},{"key":"lng","value":"72.8777"},{"key":"vehicle_type","value":"bike"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Config - Cancellation Reasons",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/config/cancellation-reasons",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Config - App Config (Public)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/config"
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "08 - Rides - Full E2E Flow",
+      "description": "Run these in order: Driver goes online → Rider requests → Driver accepts → arrived → start → complete → pay → rate",
+      "item": [
+        {
+          "name": "Step 1 - Driver Go Online (before ride)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/drivers/online",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 19.0760,\n  \"lng\": 72.8777\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Driver online', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 2 - Rider Request Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "ride-req-{{$randomUUID}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"vehicle_type\": \"bike\",\n  \"pickup_lat\": 19.0760,\n  \"pickup_lng\": 72.8777,\n  \"pickup_address\": \"Mumbai, Andheri East\",\n  \"dropoff_lat\": 19.0178,\n  \"dropoff_lng\": 72.8478,\n  \"dropoff_address\": \"Mumbai, Bandra West\",\n  \"payment_method\": \"wallet\",\n  \"preferences\": {\n    \"ac_required\": false,\n    \"female_driver_only\": false,\n    \"luggage_space\": false,\n    \"silence_mode\": false\n  }\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const b = pm.response.json();",
+            "pm.test('Has ride id', () => pm.expect(b.data).to.have.property('id'));",
+            "if (b.data && b.data.id) {",
+            "  pm.collectionVariables.set('ride_id', b.data.id);",
+            "  console.log('Ride ID saved:', b.data.id);",
+            "}"
+          ]}}]
+        },
+        {
+          "name": "Step 3 - Get Active Ride (Rider)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/active",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('ride_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Step 4 - Get Ride Details",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.ride_otp) pm.collectionVariables.set('ride_otp', b.data.ride_otp);"
+          ]}}]
+        },
+        {
+          "name": "Step 5 - Apply Promo Code",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/apply-promo",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"promo_code\": \"WELCOME10\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400 (invalid promo)', () => pm.expect([200,400,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Step 6 - Get Fare Breakdown",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/fare",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 7 - Track Ride",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/track",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 8 - Get Ride ETA",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/eta",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 9 - Driver Accept Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/accept",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Idempotency-Key", "value": "accept-{{ride_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.ride_otp) pm.collectionVariables.set('ride_otp', b.data.ride_otp);",
+            "pm.test('Status is driver_assigned', () => { if (b.data) pm.expect(b.data.status).to.eql('driver_assigned'); });"
+          ]}}]
+        },
+        {
+          "name": "Step 10 - Driver Arrived at Pickup",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/arrived",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Idempotency-Key", "value": "arrived-{{ride_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 11 - Driver Start Ride (OTP)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/start",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "start-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"otp\": \"{{ride_otp}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status is ongoing', () => { const b = pm.response.json(); if (b.data) pm.expect(b.data.status).to.eql('ongoing'); });"
+          ]}}]
+        },
+        {
+          "name": "Step 12 - Driver Update Location (mid-ride)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/drivers/location",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"lat\": 19.0500,\n  \"lng\": 72.8600,\n  \"accuracy\": 5\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 13 - Driver Complete Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/complete",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "complete-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"final_lat\": 19.0178,\n  \"final_lng\": 72.8478\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Status is completed', () => { const b = pm.response.json(); if (b.data) pm.expect(b.data.status).to.eql('completed'); });"
+          ]}}]
+        },
+        {
+          "name": "Step 14 - Process Ride Payment",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/payments/rides/{{ride_id}}/pay",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "pay-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"method\": \"wallet\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('payment_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Step 15 - Get Payment Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/payments/rides/{{ride_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Step 16 - Rider Rate Driver",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/rate",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"review\": \"Great ride, very smooth!\",\n  \"categories\": [\"punctual\", \"clean_vehicle\"]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 201', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Ride History (Rider)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/rides/history?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","rides","history"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "09 - Rides - Cancel & Retry Flow",
+      "item": [
+        {
+          "name": "Request Ride (to cancel)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "ride-cancel-test-{{$randomUUID}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"vehicle_type\": \"bike\",\n  \"pickup_lat\": 19.0760,\n  \"pickup_lng\": 72.8777,\n  \"pickup_address\": \"Mumbai, Andheri East\",\n  \"dropoff_lat\": 19.0178,\n  \"dropoff_lng\": 72.8478,\n  \"dropoff_address\": \"Mumbai, Bandra West\",\n  \"payment_method\": \"wallet\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('ride_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Retry Match",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/retry",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Idempotency-Key", "value": "retry-{{ride_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400', () => pm.expect([200,400]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Cancel Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/cancel",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "cancel-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"change_of_plan\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Driver Reject Ride",
+          "description": "Request a new ride first, then use driver token to reject",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/reject",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "reject-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"too_far\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400', () => pm.expect([200,400]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Reassign Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/reassign",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Idempotency-Key", "value": "reassign-{{ride_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400', () => pm.expect([200,400]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Update Ride Status (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/status",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "status-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"cancelled\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400', () => pm.expect([200,400]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "10 - Scheduled Rides",
+      "item": [
+        {
+          "name": "Schedule Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/schedule",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "sched-{{$randomUUID}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"vehicle_type\": \"bike\",\n  \"pickup_lat\": 19.0760,\n  \"pickup_lng\": 72.8777,\n  \"pickup_address\": \"Mumbai, Andheri East\",\n  \"dropoff_lat\": 19.0178,\n  \"dropoff_lng\": 72.8478,\n  \"dropoff_address\": \"Mumbai, Bandra West\",\n  \"scheduled_at\": \"2026-06-01T10:30:00Z\",\n  \"notes\": \"Airport drop\",\n  \"preferences\": {\n    \"ac_required\": true,\n    \"luggage_space\": true\n  }\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('scheduled_ride_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Get Scheduled Rides",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/scheduled",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('scheduled_ride_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Get Scheduled Ride Details",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/scheduled/{{scheduled_ride_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Update Scheduled Ride",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/rides/scheduled/{{scheduled_ride_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "sched-upd-{{scheduled_ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"scheduled_at\": \"2026-06-01T11:00:00Z\",\n  \"notes\": \"Updated: Airport drop - Terminal 2\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Cancel Scheduled Ride",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/rides/scheduled/{{scheduled_ride_id}}/cancel",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Idempotency-Key", "value": "sched-cancel-{{scheduled_ride_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "11 - Ratings & Reviews",
+      "item": [
+        {
+          "name": "Get My Ride Rating",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/my-rating",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Get Driver Reviews",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/drivers/{{driver_id}}/reviews?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","drivers","{{driver_id}}","reviews"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Get Driver Rating Summary",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/drivers/{{driver_id}}/rating-summary",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Report a Rating",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ratings/{{ride_id}}/report",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"inappropriate_content\",\n  \"description\": \"Rating contains offensive language\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "12 - Emergency Contacts & SOS",
+      "item": [
+        {
+          "name": "Add Emergency Contact",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/emergency-contacts",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Mom\",\n  \"phone\": \"9999999998\",\n  \"relationship\": \"parent\",\n  \"priority\": 1\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('contact_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Get Emergency Contacts",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/emergency-contacts",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('contact_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Update Emergency Contact",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/auth/emergency-contacts/{{contact_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Dad\",\n  \"phone\": \"9999999997\",\n  \"relationship\": \"parent\",\n  \"priority\": 2\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Trigger SOS",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/sos/trigger",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"latitude\": 19.0760,\n  \"longitude\": 72.8777,\n  \"address\": \"Mumbai, Andheri East\",\n  \"ride_id\": \"{{ride_id}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('sos_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "SOS History",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/sos/history?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","sos","history"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Active SOS Events",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/sos/active?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","admin","sos","active"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('sos_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Admin - Resolve SOS",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/sos/{{sos_id}}/resolve",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"notes\": \"Resolved - user contacted and confirmed safe\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Remove Emergency Contact",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/auth/emergency-contacts/{{contact_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "13 - Support Tickets",
+      "item": [
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/users/support/tickets",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"category\": \"payment\",\n  \"priority\": \"high\",\n  \"subject\": \"Refund pending for ride\",\n  \"description\": \"Payment was deducted but ride was cancelled. Refund not received.\",\n  \"ride_id\": \"{{ride_id}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('ticket_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "My Tickets",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/users/support/tickets?page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","users","support","tickets"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('ticket_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Ticket Details",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/users/support/tickets/{{ticket_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Add Message to Ticket",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/users/support/tickets/{{ticket_id}}/messages",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Any update on this? It has been 3 days.\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin - All Tickets",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/support/tickets?status=open&category=payment&page=1&per_page=10", "host": ["{{base_url}}"], "path": ["api","v1","admin","support","tickets"], "query": [{"key":"status","value":"open"},{"key":"category","value":"payment"},{"key":"page","value":"1"},{"key":"per_page","value":"10"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('ticket_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Admin - Update Ticket",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/admin/support/tickets/{{ticket_id}}",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"investigating\",\n  \"priority\": \"high\",\n  \"resolution\": \"Refund initiated, will reflect in 3-5 days\",\n  \"refund_amount\": 150\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Add Message to Ticket",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/support/tickets/{{ticket_id}}/messages",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"message\": \"We have initiated the refund. Please allow 3-5 business days.\",\n  \"is_internal\": false\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "14 - Notifications",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/notifications?page=1&limit=20", "host": ["{{base_url}}"], "path": ["api","v1","notifications"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"20"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('notification_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Mark All Notifications Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/notifications/read-all",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/notifications/{{notification_id}}/read",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/notifications/{{notification_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "15 - Payments - Refund & Withdrawal",
+      "item": [
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/payments/{{payment_id}}/refund",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "refund-{{payment_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 50,\n  \"reason\": \"partial refund - driver arrived late\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Retry Payment",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/payments/rides/{{ride_id}}/retry",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "retry-pay-{{ride_id}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"method\": \"wallet\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 400', () => pm.expect([200,400]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Request Withdrawal (Driver)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/withdrawals",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{driver_token}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "withdraw-{{$randomUUID}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 500,\n  \"method\": \"bank_transfer\",\n  \"bank_details\": {\n    \"account_number\": \"1234567890\",\n    \"ifsc\": \"SBIN0001234\",\n    \"account_holder_name\": \"Test Driver\"\n  }\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200 or 400', () => pm.expect([200,201,400]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('withdrawal_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Admin - Pending Withdrawals",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/withdrawals/pending?page=1&per_page=20", "host": ["{{base_url}}"], "path": ["api","v1","admin","withdrawals","pending"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.length > 0) pm.collectionVariables.set('withdrawal_id', b.data[0].id);"
+          ]}}]
+        },
+        {
+          "name": "Admin - Process Withdrawal",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/withdrawals/process",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"withdrawal_id\": \"{{withdrawal_id}}\",\n  \"approved\": true,\n  \"rejection_reason\": \"\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "16 - Admin - Dashboard & Reports",
+      "item": [
+        {
+          "name": "Admin - Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/admin/dashboard",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - All Rides",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/rides?page=1&per_page=20&status=completed", "host": ["{{base_url}}"], "path": ["api","v1","admin","rides"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"},{"key":"status","value":"completed"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - All Users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/users?page=1&per_page=20", "host": ["{{base_url}}"], "path": ["api","v1","admin","users"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - All Payments",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/payments?page=1&per_page=20", "host": ["{{base_url}}"], "path": ["api","v1","admin","payments"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Reports (Daily Earnings)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/reports?type=daily_earnings", "host": ["{{base_url}}"], "path": ["api","v1","admin","reports"], "query": [{"key":"type","value":"daily_earnings"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Reports (Driver Performance)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/reports?type=driver_performance", "host": ["{{base_url}}"], "path": ["api","v1","admin","reports"], "query": [{"key":"type","value":"driver_performance"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Reports (Revenue Summary)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/reports?type=revenue_summary", "host": ["{{base_url}}"], "path": ["api","v1","admin","reports"], "query": [{"key":"type","value":"revenue_summary"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "17 - Admin - Surge, Promo & Config",
+      "item": [
+        {
+          "name": "Admin - Create Surge Pricing",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/surge-pricing",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"area_name\": \"Mumbai CBD\",\n  \"lat\": 19.0760,\n  \"lng\": 72.8777,\n  \"radius_km\": 4,\n  \"multiplier\": 1.5,\n  \"reason\": \"peak demand - evening rush\",\n  \"duration_hours\": 2\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));",
+            "const b = pm.response.json();",
+            "if (b.data && b.data.id) pm.collectionVariables.set('surge_id', b.data.id);"
+          ]}}]
+        },
+        {
+          "name": "Admin - Remove Surge Pricing",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/v1/admin/surge-pricing/{{surge_id}}",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Create Promo Code",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/promo-codes",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"WELCOME10\",\n  \"description\": \"10% off for new users\",\n  \"discount_type\": \"percentage\",\n  \"discount_value\": 10,\n  \"max_discount\": 50,\n  \"min_ride_amount\": 100,\n  \"max_uses\": 1000,\n  \"max_uses_per_user\": 1,\n  \"vehicle_types\": [\"bike\", \"car_go\"],\n  \"start_date\": \"2026-01-01T00:00:00Z\",\n  \"end_date\": \"2026-12-31T23:59:59Z\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 409 (already exists)', () => pm.expect([200,201,409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Update App Config",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/v1/admin/config",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"key\": \"max_cancellations_per_day\",\n  \"value\": \"5\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Config - App Config (Admin view)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/config",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "18 - Admin - Ledger",
+      "item": [
+        {
+          "name": "Ledger - Accounts",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/ledger/accounts?page=1&per_page=20", "host": ["{{base_url}}"], "path": ["api","v1","admin","ledger","accounts"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Ledger - Entries",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/ledger/entries?page=1&per_page=20", "host": ["{{base_url}}"], "path": ["api","v1","admin","ledger","entries"], "query": [{"key":"page","value":"1"},{"key":"per_page","value":"20"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Ledger - Account Balance",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/ledger/account-balance?account_id={{rider_id}}", "host": ["{{base_url}}"], "path": ["api","v1","admin","ledger","account-balance"], "query": [{"key":"account_id","value":"{{rider_id}}"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Ledger - Audit Batch",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/ledger/audit-batch",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"batch_id\": \"batch-test-001\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "19 - Admin - Bulk Operations",
+      "item": [
+        {
+          "name": "Bulk - Verify Drivers",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/bulk/verify-drivers",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"driver_ids\": [\"{{driver_id}}\"],\n  \"notes\": \"Bulk verified for testing\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Bulk - Send Notifications",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/bulk/notify",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"user_ids\": [\"{{rider_id}}\"],\n  \"user_type\": \"rider\",\n  \"title\": \"Special Offer!\",\n  \"body\": \"Get 20% off your next ride with code SAVE20\",\n  \"channels\": [\"push\", \"in_app\"]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Bulk - Update Driver Status",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/bulk/update-driver-status",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"driver_ids\": [\"{{driver_id}}\"],\n  \"status\": \"active\",\n  \"reason\": \"Reactivated after review\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Bulk - Import Drivers",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/admin/bulk/import-drivers",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"drivers\": [\n    {\n      \"name\": \"Import Driver 1\",\n      \"email\": \"import1@example.com\",\n      \"phone\": \"9876540001\",\n      \"license_number\": \"KA0120240001\",\n      \"vehicle_type\": \"bike\",\n      \"vehicle_number_plate\": \"KA01IM0001\"\n    }\n  ]\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 201', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "20 - Admin - Debug & Match Status",
+      "item": [
+        {
+          "name": "Admin - Debug User Password",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/admin/debug/password?user_id={{rider_id}}", "host": ["{{base_url}}"], "path": ["api","v1","admin","debug","password"], "query": [{"key":"user_id","value":"{{rider_id}}"}] },
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Ride Match Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/match-status",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Admin - Ride Failure Reason",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/rides/{{ride_id}}/failure-reason",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }]
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
